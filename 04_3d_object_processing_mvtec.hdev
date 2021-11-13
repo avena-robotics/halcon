@@ -1,0 +1,90 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<hdevelop file_version="1.2" halcon_version="21.05.0.0">
+<procedure name="main">
+<interface/>
+<body>
+<c>*****************************************************************</c>
+<c>*</c>
+<c>* Evaluation</c>
+<c>*</c>
+<c>*****************************************************************</c>
+<c>*</c>
+<c>*****************************************************************</c>
+<c>* Initialization</c>
+<c>*****************************************************************</c>
+<l>dev_update_off ()</l>
+<c>* Initialization of the display window</c>
+<l>dev_close_window ()</l>
+<l>dev_open_window (0, 0, 512, 512, 'black', WindowHandle)</l>
+<c>*</c>
+<c>*****************************************************************</c>
+<c>* Application</c>
+<c>*****************************************************************</c>
+<l>DataPath := 'temp_output/'</l>
+<c></c>
+<l>read_image (Disparity, DataPath + 'disparity')</l>
+<l>read_image (X, DataPath + 'X')</l>
+<l>read_image (Y, DataPath + 'Y')</l>
+<l>read_image (Z, DataPath + 'Z')</l>
+<l>read_cam_par (DataPath + 'RectCamParL.dat', RectCamParL)</l>
+<l>read_cam_par (DataPath + 'RectCamParR.dat', RectCamParR)</l>
+<l>read_pose (DataPath + 'RectL_P_RectR.dat', RectLPosRectR)</l>
+<l>disparity_image_to_xyz(Disparity,X,Y,Z,RectCamParL,RectCamParR,RectLPosRectR)</l>
+<l>xyz_to_object_model_3d(X,Y,Z,ObjectModel3D)</l>
+<c></c>
+<l>regiongrowing (Z, Regions, 3, 3, 0.06, 100)</l>
+<l>select_shape_std (Regions, SelectedRegion, 'max_area', 70)</l>
+<l>fill_up (SelectedRegion, RegionFillUp)</l>
+<l>closing_rectangle1 (RegionFillUp, RegionClosing, 100, 100)</l>
+<l>reduce_domain (Z, RegionClosing, ZReduced)</l>
+<l>xyz_to_object_model_3d(X,Y,ZReduced,OM3DScene)</l>
+<c></c>
+<l>regiongrowing (ZReduced, Regions1, 5, 5, 0.005, 100)</l>
+<l>select_shape_std (Regions1, SelectedRegions, 'max_area', 70)</l>
+<l>reduce_domain (ZReduced, SelectedRegions, ZReducedTable)</l>
+<l>xyz_to_object_model_3d(X,Y,ZReducedTable,OM3DTable)</l>
+<c></c>
+<c>* Fit the table to get its pose</c>
+<c>* This pose will be used for calculation of object pose</c>
+<c>* Because we don't know the rotation of object, so we just want to grip it from top</c>
+<l>fit_primitives_object_model_3d (OM3DTable, ['primitive_type','fitting_algorithm'], ['plane','least_squares_tukey'], OM3DTable)</l>
+<l>get_object_model_3d_params (OM3DTable, 'primitive_pose', Cam1_P_Table)</l>
+<c></c>
+<c>* Sample the scene to make visulization faster</c>
+<l>sample_object_model_3d (OM3DScene, 'fast', 0.005, [], [], SampledObjectModel3D)</l>
+<l>connection_object_model_3d (SampledObjectModel3D, 'distance_3d', 0.05, ObjectModel3DConnected)</l>
+<l>select_object_model_3d (ObjectModel3DConnected, 'num_points', 'and', 1000, 99999999999, ObjectModel3DSelected)</l>
+<c></c>
+<c>* Detect a object in 2D image and get its 3D pose in scene</c>
+<l>read_image (ImageRectifiedL, DataPath + 'ImageRectifiedL')</l>
+<l>gen_circle (ROI_0, 2038.81, 1788.21, 87.8948)</l>
+<l>dev_display (ROI_0)</l>
+<l>reduce_domain (Z, ROI_0, ImageReduced)</l>
+<l>xyz_to_object_model_3d(X,Y,ImageReduced,OM3DObject)</l>
+<c></c>
+<c>* Calculate the gripping pose</c>
+<l>get_object_model_3d_params (OM3DObject, 'point_coord_x', OM3DObjectX)</l>
+<l>get_object_model_3d_params (OM3DObject, 'point_coord_y', OM3DObjectY)</l>
+<l>get_object_model_3d_params (OM3DObject, 'point_coord_z', OM3DObjectZ)</l>
+<c></c>
+<l>gen_robot_tool_and_base_object_model_3d (0.005, 0.1, OM3DToolOrigin, OM3DBase)</l>
+<l>create_pose (mean(OM3DObjectX), mean(OM3DObjectY), mean(OM3DObjectZ), Cam1_P_Table[3], Cam1_P_Table[4], Cam1_P_Table[5], 'Rp+T', 'gba', 'point', GrippingPose)</l>
+<l>rigid_trans_object_model_3d (OM3DBase, GrippingPose, GrippingArrows)</l>
+<l>* visualize_object_model_3d (WindowHandle, [SampledObjectModel3D,OM3DObject,GrippingArrows], [], [], ['colored'], [12], [], [], [], PoseOut)</l>
+<l>dev_inspect_ctrl ([SampledObjectModel3D,OM3DObject,GrippingArrows])</l>
+<l>stop ()</l>
+<l>dev_close_inspect_ctrl([SampledObjectModel3D,OM3DObject,GrippingArrows])</l>
+<c>*</c>
+<c>*****************************************************************</c>
+<c>* Clean up</c>
+<c>*****************************************************************</c>
+<l>dev_clear_window ()</l>
+<l>dev_update_on ()</l>
+<l>dev_disp_text ('End of program', 'window', 'top', 'left', 'black', [], [])</l>
+<c></c>
+</body>
+<docu id="main">
+<parameters/>
+</docu>
+</procedure>
+</hdevelop>

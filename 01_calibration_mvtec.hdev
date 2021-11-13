@@ -1,0 +1,131 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<hdevelop file_version="1.2" halcon_version="21.05.0.0">
+<procedure name="main">
+<interface/>
+<body>
+<l>dev_update_off ()</l>
+<c></c>
+<c>* set the image path - extrinsics or intrinsics if you use our datasets</c>
+<l>ImgPath := 'basler_4k_calibration/intrinsics/'</l>
+<l>OutPath := 'temp_output/'</l>
+<c>* read the first images to get their size</c>
+<l>I := 0</l>
+<l>read_image (ImageL, ImgPath + 'CAM1_okno/ImageL' + I$'02d')</l>
+<l>read_image (ImageR, ImgPath + 'CAM1_okno/ImageR' + I$'02d')</l>
+<c>* reopen the windows with an appropriate size</c>
+<l>dev_close_window ()</l>
+<l>get_image_size (ImageL, WidthL, HeightL)</l>
+<l>get_image_size (ImageR, WidthR, HeightR)</l>
+<l>dev_open_window (0, 0, WidthL/4, HeightL/4, 'black', WindowHandle1)</l>
+<l>set_display_font (WindowHandle1, 14, 'mono', 'true', 'false')</l>
+<l>dev_open_window (0, WidthL/4 + 12, WidthL/4, HeightL/4, 'black', WindowHandle2)</l>
+<l>dev_open_window (HeightL/4 + 80, 0, WidthL/4, HeightL/4, 'black', WindowHandle3)</l>
+<l>dev_open_window (HeightL/4 + 80, WidthL/4 + 12, WidthL/4, HeightL/4, 'black', WindowHandle4)</l>
+<c></c>
+<c>* set the initial values for the internal camera, you need to give focus parameter</c>
+<c>* for Basler it is 0.004 (4mm) and cell size, which is 2e-6</c>
+<l>gen_cam_par_area_scan_polynomial (0.004, 0.0, 0.0, 0.0, 0.0, 0.0, 2e-6, 2e-6, WidthL * .5, HeightL * .5, WidthL, HeightL, StartCamParL)</l>
+<c></c>
+<c>* create a calibration data model in which all calibration data</c>
+<c>* including the image coordinates of the calibration marks and</c>
+<c>* the observation poses of the calibration plate</c>
+<l>create_calib_data ('calibration_object', 2, 1, CalibDataID)</l>
+<l>set_calib_data_cam_param (CalibDataID, 'all', [], StartCamParL)</l>
+<l>set_calib_data_calib_object (CalibDataID, 0, 'basler_4k_calibration/calplate.cpd')</l>
+<c></c>
+<c>* start the loop over the calibration images, you have to specify Images amount</c>
+<l>for I := 0 to 28 by 1</l>
+<c>    * read and display the calibration images</c>
+<l>    read_image (ImageL, ImgPath + 'CAM1_okno/ImageL' + I$'02d')</l>
+<l>    read_image (ImageR, ImgPath + 'CAM1_okno/ImageR' + I$'02d')</l>
+<l>    dev_set_window (WindowHandle1)</l>
+<l>    dev_display (ImageL)</l>
+<l>    dev_set_window (WindowHandle2)</l>
+<l>    dev_display (ImageR)</l>
+<c>    * find the calibration plate and store observations</c>
+<c>    * in the calibration data model</c>
+<l>    find_calib_object (ImageL, CalibDataID, 0, 0, I, [], [])</l>
+<l>    find_calib_object (ImageR, CalibDataID, 1, 0, I, [], [])</l>
+<c>    </c>
+<c>    * visualize the extracted calibration marks and the</c>
+<c>    * coordinate system defined by the estimated pose.</c>
+<l>    visualize_observation_results (ImageL, CalibDataID, 0, I, WindowHandle1)</l>
+<l>    visualize_observation_results (ImageR, CalibDataID, 1, I, WindowHandle2)</l>
+<l>    disp_message (WindowHandle1, 'Image processed  ' + I$'02d', 'window', 12, 12, 'black', 'true')</l>
+<c></c>
+<l>endfor</l>
+<l>    calibrate_cameras (CalibDataID, Errors)</l>
+<l>    wait_seconds (.2)</l>
+<c>* perform the actual calibration</c>
+<c>* get the calibrated Intrinsics camera parameters</c>
+<l>get_calib_data (CalibDataID, 'camera', 0, 'params', CamParamL)</l>
+<l>get_calib_data (CalibDataID, 'camera', 0, 'params_labels', ParLabelsL)</l>
+<l>get_calib_data (CalibDataID, 'camera', 1, 'params', CamParamR)</l>
+<l>get_calib_data (CalibDataID, 'camera', 1, 'params_labels', ParLabelsR)</l>
+<c></c>
+<c>* since the left camera is the reference camera for the</c>
+<c>* calib data model, the pose of the right camera is its</c>
+<c>* pose relative to the left camera</c>
+<c>* getting pose Tf, R</c>
+<l>get_calib_data (CalibDataID, 'camera', 1, 'pose', cLPcR)</l>
+<c></c>
+<c>* save individual results for camera Intrinsics parameter and Extrinsics / change name of files for different cameras pairs</c>
+<l>write_cam_par (CamParamL, OutPath + 'CAM1_okno_L.dat')</l>
+<l>write_cam_par (CamParamR, OutPath + 'CAM1_okno_R.dat')</l>
+<l>write_pose (cLPcR, OutPath + 'CAM1_okno_L_Pose_R.dat')</l>
+</body>
+<docu id="main">
+<parameters/>
+</docu>
+</procedure>
+<procedure name="visualize_observation_results">
+<interface>
+<io>
+<par name="Image" base_type="iconic" dimension="0"/>
+</io>
+<ic>
+<par name="CalibDataID" base_type="ctrl" dimension="0"/>
+<par name="CameraIdx" base_type="ctrl" dimension="0"/>
+<par name="PoseIdx" base_type="ctrl" dimension="0"/>
+<par name="WindowHandle" base_type="ctrl" dimension="0"/>
+</ic>
+</interface>
+<body>
+<l>get_calib_data_observ_points (CalibDataID, CameraIdx, 0, PoseIdx, RCoord, CCoord, Index, Pose)</l>
+<l>get_calib_data (CalibDataID, 'camera', CameraIdx, 'init_params', CamPar)</l>
+<c></c>
+<l>dev_set_window (WindowHandle)</l>
+<l>dev_display (Image)</l>
+<l>dev_set_color ('yellow')</l>
+<l>gen_cross_contour_xld (Cross, RCoord, CCoord, 6, 0.785398)</l>
+<l>dev_display (Cross)</l>
+<l>ArrowLength := 0.02</l>
+<l>ArrowX_CPCS := [0,ArrowLength,0]</l>
+<l>ArrowY_CPCS := [0,0,ArrowLength]</l>
+<l>ArrowZ_CPCS := [0,0,0]</l>
+<l>pose_to_hom_mat3d (Pose, HomMat_CPCS_CCS)</l>
+<l>affine_trans_point_3d (HomMat_CPCS_CCS, ArrowX_CPCS, ArrowY_CPCS, ArrowZ_CPCS, ArrowX_CCS, ArrowY_CCS, ArrowZ_CCS)</l>
+<l>project_3d_point (ArrowX_CCS, ArrowY_CCS, ArrowZ_CCS, CamPar, ArrowRow, ArrowColumn)</l>
+<l>dev_set_color ('green')</l>
+<l>gen_arrow_contour_xld (ArrowX, ArrowRow[0], ArrowColumn[0], ArrowRow[1], ArrowColumn[1], 5, 5)</l>
+<l>gen_arrow_contour_xld (ArrowY, ArrowRow[0], ArrowColumn[0], ArrowRow[2], ArrowColumn[2], 5, 5)</l>
+<l>dev_display (ArrowX)</l>
+<l>dev_display (ArrowY)</l>
+<l>set_tposition (WindowHandle, ArrowRow[1], ArrowColumn[1])</l>
+<l>write_string (WindowHandle, 'x')</l>
+<l>set_tposition (WindowHandle, ArrowRow[2], ArrowColumn[2])</l>
+<l>write_string (WindowHandle, 'y')</l>
+<l>dev_set_color ('white')</l>
+<l>return ()</l>
+</body>
+<docu id="visualize_observation_results">
+<parameters>
+<parameter id="CalibDataID"/>
+<parameter id="CameraIdx"/>
+<parameter id="Image"/>
+<parameter id="PoseIdx"/>
+<parameter id="WindowHandle"/>
+</parameters>
+</docu>
+</procedure>
+</hdevelop>
